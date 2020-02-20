@@ -1,11 +1,14 @@
 '''
-  This module creates a csv file 'Cleaned_Pilot_CALL_Accuracy.csv' contained in the folder 'pilot_CALL_accuracy'. 
+  This module creates a csv file in the form of '[FOLDER]_CALL_Accuracy_[DATE].csv'. This input file was created by the 
+  cleanAll() function from the module cleanall.py. The output file is stored in the same folder as the input file is. 
   This module computes several accuracy measurements based on the 'compDialogue_key.corr' column of the imput file
-  'cleaned_ALL/cleaned_ALL_Pilot_[DATE].csv'.
+  [FOLDER]_cleaned_ALL_Pilot_[DATE].csv.
 '''
 import os
+import re
 import pandas as pd
 import glob
+from datetime import datetime
 
 def totals(df):
 
@@ -88,58 +91,68 @@ def indexRightAnswers(d_total, d_rights):
     return(idx)
 
 
+def selectFolder(pattern, flist):
+
+    ''' Returns a list of the folders that match a given patter '''
+
+    result = []
+    for f in flist:
+        if re.search(pattern, f):
+            result.append(f)
+    return result
+
+
 def accuracy():
 
     ''' Reads the 'cleaned_ALL/cleaned_ALL_Pilot_[DATE].csv' file to perform different acccuracy indices
         on each participant and stores them in a nre file 'pilot_CALL_accuracy/Cleaned_Pilot_CALL_Accuracy.csv'. '''
-
-    # Creates dataframe to store accuracies
-    dfacc = pd.DataFrame(columns=['participant', 'condition', 'B1AccTotal', 'B1AccOC',
-     'B1AccCC', 'B5AccTotal','B5AccOldTotal', 'B5AccNewTotal', 'B5AccTotalOC', 'B5AccTotalCC',
-     'B5AccOldOC','B5AccOldCC','B5AccNewOC', 'B5AccNewCC'])
-
-    # Creates a folder to store the 'Cleaned_Pilot_CALL_Accuracy.csv'
-    if not os.path.exists("pilot_CALL_accuracy"):
-        os.mkdir("pilot_CALL_accuracy")
+ 
+    # Gets the list of folders containing the input [FOLDER]_cleaned_ALL_Pilot_[DATE].csv files.
+    pattern = re.compile('[FS][0-9]{2}Data')
+    f_list = os.listdir('../')
+    folder_list = selectFolder(pattern, f_list)
     
-    ### If a cleaned_ALL file already exists in the 'cleaned_ALL' folder, do we delete de existen one??
-    #If we keep several version, we can retrive the latest one by checking their creation time (ctime)
-    #Also we should include the hh:mm:ss in the file name of the cleaned_ALL just in case we create
-    ## several of the the same day
+    for folder in folder_list:
+        # Creates dataframe to store accuracies
+        dfacc = pd.DataFrame(columns=['participant', 'condition', 'B1AccTotal', 'B1AccOC',
+           'B1AccCC', 'B5AccTotal','B5AccOldTotal', 'B5AccNewTotal', 'B5AccTotalOC', 'B5AccTotalCC',
+           'B5AccOldOC','B5AccOldCC','B5AccNewOC', 'B5AccNewCC'])
 
-    # Gets the 'cleaned_ALL_Pilot_[DATE].csv' file
-    cleaned_file = glob.glob('cleaned_ALL/cleaned_ALL_Pilot_*.csv')
-   
-    # Opens 'cleaned_ALL_Pilot_[DATE].csv' file. ***Looks for the leatest one (ctime)***
-    try:
-        dfclean = pd.read_csv(cleaned_file[0], encoding='utf-8-sig', header=0)
-    except IOError as e:
-    	print(e)  
-    
-    # Makes a set holding all the participants
-    participants =set(dfclean['participant'])
-    
-    for p in participants:
-
-        # Takes the section of each participant p
-        a = dfclean[dfclean['participant']==p]
-
-        # Calculates the accuracy indeces and stores them in the 'acc' dic
-        acc = indexRightAnswers(totals(a), rightAnswers(a))
-        
-        #Adds 'participant' and 'condition'
-        acc['participant'] = p
-        acc['condition'] = a['condition'].iloc[0]
-        
-        # Adds new line to the dataframe 
-        dfacc = dfacc.append(acc, ignore_index=True)
+        # Gets the 'cleaned_ALL_Pilot_[DATE].csv' file
+        cleaned_file = glob.glob('../' + folder + '/[FS][0-9][0-9]Data_cleaned_ALL_Pilot_*.csv')
      
-    # Save the dataframe in a csv file in the 'Pilot_CALL_accuracy' folder
-    try:
-        dfacc.to_csv('pilot_CALL_accuracy/Cleaned_Pilot_CALL_Accuracy.csv', encoding='utf-8-sig', index=False)
-    except IOError as e:
-    	print(e)
+        # From cleaned_file gets the most recent.
+        filename = max(cleaned_file, key=os.path.getctime)
+        
+        # Opens 'cleaned_ALL_Pilot_[DATE].csv' file. ***Looks for the leatest one (ctime)***
+        try:
+            dfclean = pd.read_csv(filename, encoding='utf-8-sig', header=0)
+        except IOError as e:
+            print(e)  
+        
+        # Makes a set holding all the participants
+        participants =set(dfclean['participant'])
+        
+        for p in participants:
+            # Takes the section of each participant p
+            a = dfclean[dfclean['participant']==p]
+            # Calculates the accuracy indeces and stores them in the 'acc' dic
+            acc = indexRightAnswers(totals(a), rightAnswers(a))  
+            #Adds 'participant' and 'condition'
+            acc['participant'] = p
+            acc['condition'] = a['condition'].iloc[0]
+            # Adds new line to the dataframe 
+            dfacc = dfacc.append(acc, ignore_index=True)
 
+        # Gets the current date.
+        currentdate = datetime.now().strftime('%b_%d_%Y_%H-%M-%S')
 
+        # Save the dataframe in a csv file in the 'Pilot_CALL_accuracy' folder
+        try:
+            dfacc.to_csv(f'../'+ folder + '/' + folder + '_CALL_Accuracy_' + currentdate +'.csv', encoding='utf-8-sig', index=False)
+        except IOError as e:
+            print(e)
+
+    
 
 
